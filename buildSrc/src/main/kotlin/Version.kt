@@ -1,7 +1,7 @@
 object Version {
-    const val compose = "1.6.11"
+    const val compose = "1.7.3"
     const val jvmTarget = "17"
-    const val kotlin = "1.9.24"
+    const val kotlin = "1.9.25"
 
     object Android {
         const val compileSdk = 35

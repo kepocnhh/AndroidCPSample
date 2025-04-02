@@ -1,0 +1,2 @@
+# AndroidCPSample
+Content providers sample.

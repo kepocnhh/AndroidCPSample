@@ -1,10 +1,12 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
-import sp.gx.core.asFile
 import sp.gx.core.buildDir
 import sp.gx.core.camelCase
 import sp.gx.core.create
 import sp.gx.core.getByName
-import sp.gx.core.kebabCase
+import sp.gx.core.map
+import sp.gx.core.qn
+import sp.gx.core.string
+import sp.gx.core.xml
 
 repositories {
     google()
@@ -50,7 +52,12 @@ android {
 androidComponents.onVariants { variant ->
     val output = variant.outputs.single()
     check(output is com.android.build.api.variant.impl.VariantOutputImpl)
-    output.outputFileName = "${kebabCase(rootProject.name, android.defaultConfig.versionName!!, variant.name, android.defaultConfig.versionCode!!.toString())}.apk"
+    output.outputFileName = listOf(
+        rootProject.name,
+        android.defaultConfig.versionName!!,
+        variant.name,
+        android.defaultConfig.versionCode!!.toString(),
+    ).joinToString(separator = "-", postfix = ".apk")
     afterEvaluate {
         tasks.getByName<JavaCompile>("compile", variant.name, "JavaWithJavac") {
             targetCompatibility = Version.jvmTarget
@@ -61,19 +68,15 @@ androidComponents.onVariants { variant ->
         val checkManifestTask = tasks.create("checkManifest", variant.name) {
             dependsOn(camelCase("compile", variant.name, "Sources"))
             doLast {
-                val file = layout.buildDir()
+                val actual = layout.buildDir()
                     .dir("intermediates/merged_manifests/${variant.name}")
                     .dir(camelCase("process", variant.name, "Manifest"))
-                    .asFile("AndroidManifest.xml")
-                val manifest = groovy.xml.XmlParser().parse(file)
-                val actual = manifest.getAt(groovy.namespace.QName.valueOf("uses-permission")).map {
-                    check(it is groovy.util.Node)
-                    val key = groovy.namespace.QName.valueOf("{http://schemas.android.com/apk/res/android}name")
-                    it.attributes()[key] as String
-                }
-                val applicationId by variant.applicationId
+                    .xml("AndroidManifest.xml")
+                    .map("uses-permission".qn()) {
+                        it.string("{http://schemas.android.com/apk/res/android}name".qn())
+                    }
                 val expected = setOf(
-                    "$applicationId.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
+                    "${variant.applicationId.get()}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
                 )
                 check(actual.sorted() == expected.sorted()) {
                     "Actual is:\n$actual\nbut expected is:\n$expected"

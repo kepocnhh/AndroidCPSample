@@ -1,0 +1,9 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application
+        android:label="CP/Foo">
+        <provider
+            android:name=".provider.SharedContentProvider"
+            android:authorities="foo.authority.provider"
+            android:exported="true"/>
+    </application>
+</manifest>

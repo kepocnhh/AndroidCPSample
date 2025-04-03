@@ -1,6 +1,5 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application
-        android:label="CPSample">
+    <application>
         <activity android:name=".MainActivity"
             android:screenOrientation="portrait"
             android:exported="true">

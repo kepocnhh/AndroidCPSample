@@ -1,9 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application
-        android:label="CP/Foo">
+        android:label="CP/Bar">
         <provider
             android:name=".provider.FinalContentProvider"
-            android:authorities="test.android.cp.foo.authority.provider"
+            android:authorities="test.android.cp.bar.authority.provider"
             android:exported="true"/>
     </application>
 </manifest>

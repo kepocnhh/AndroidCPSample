@@ -47,6 +47,22 @@ android {
     }
 
     composeOptions.kotlinCompilerExtensionVersion = "1.5.15"
+
+    productFlavors {
+        "version".also { dimension ->
+            flavorDimensions += dimension
+            create("foo") {
+                this.dimension = dimension
+                applicationIdSuffix = ".$name"
+                versionNameSuffix = "-$name"
+            }
+            create("bar") {
+                this.dimension = dimension
+                applicationIdSuffix = ".$name"
+                versionNameSuffix = "-$name"
+            }
+        }
+    }
 }
 
 androidComponents.onVariants { variant ->

@@ -16,7 +16,10 @@ internal class MainActivity : ComponentActivity() {
         setContentView(view)
         view.setContent {
             Box(modifier = Modifier.fillMaxSize()) {
-                BasicText(modifier = Modifier.align(Alignment.Center), text = "foobarbaz")
+                BasicText(
+                    modifier = Modifier.align(Alignment.Center),
+                    text = BuildConfig.APPLICATION_ID,
+                )
             }
         }
     }

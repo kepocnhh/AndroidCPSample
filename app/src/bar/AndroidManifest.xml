@@ -4,6 +4,7 @@
         <provider
             android:name=".provider.FinalContentProvider"
             android:authorities="test.android.cp.bar.authority.provider"
-            android:exported="true"/>
+            android:exported="true"
+            android:permission="test.android.cp.permission.provider"/>
     </application>
 </manifest>

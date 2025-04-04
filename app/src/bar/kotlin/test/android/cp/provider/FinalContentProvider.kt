@@ -4,6 +4,7 @@ import android.content.ContentProvider
 import android.content.ContentValues
 import android.content.UriMatcher
 import android.database.Cursor
+import android.database.MatrixCursor
 import android.net.Uri
 
 internal class FinalContentProvider : ContentProvider() {
@@ -26,17 +27,10 @@ internal class FinalContentProvider : ContentProvider() {
     ): Cursor? {
         when (uriMatcher.match(uri)) {
             1 -> {
-                val rows = listOf(
-                    mapOf(
-                        "firstName" to "fn:bar:1",
-                        "lastName" to "ln:bar:1",
-                    ),
-                    mapOf(
-                        "firstName" to "fn:bar:2",
-                        "lastName" to "ln:bar:2",
-                    ),
-                )
-                return FinalCursor(rows = rows)
+                val cursor = MatrixCursor(arrayOf("firstName", "lastName"))
+                cursor.addRow(arrayOf("fn:bar:1", "ln:bar:1"))
+                cursor.addRow(arrayOf("fn:bar:2", "ln:bar:2"))
+                return cursor
             }
             else -> error("No match uri $uri!")
         }

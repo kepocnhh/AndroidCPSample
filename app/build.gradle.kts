@@ -93,7 +93,7 @@ androidComponents.onVariants { variant ->
                     }
                 val expected = setOf(
                     "${variant.applicationId.get()}.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION",
-//                    "test.android.cp.permission.provider", // todo
+                    "test.android.cp.permission.provider", // todo
                 )
                 check(actual.sorted() == expected.sorted()) {
                     "Actual is:\n$actual\nbut expected is:\n$expected"

@@ -48,11 +48,6 @@ android {
                 }
             }
         }
-        for (buildType in this) {
-            getByName(buildType.name) {
-//                manifestPlaceholders["buildType"] = name
-            }
-        }
     }
 
     buildFeatures {
@@ -65,7 +60,7 @@ android {
     productFlavors {
         "version".also { dimension ->
             flavorDimensions += dimension
-            setOf("pf1").forEach { name ->
+            setOf("pf1", "pf2").forEach { name ->
                 create(name) {
                     this.dimension = dimension
                     applicationIdSuffix = ".$name"
@@ -73,11 +68,6 @@ android {
                 }
             }
         }
-    }
-    applicationVariants.all {
-//        variant.mergedFlavor.manifestPlaceholders["buildType"] = variant.buildType
-//        variant.mergedFlavor.manifestPlaceholders["flavorName"] = variant.flavorName
-//        mergedFlavor.manifestPlaceholders["applicationId"] = applicationId
     }
 }
 

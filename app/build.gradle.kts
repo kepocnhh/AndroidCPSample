@@ -33,11 +33,25 @@ android {
     }
 
     buildTypes {
-        getByName("debug") {
-            applicationIdSuffix = ".$name"
-            versionNameSuffix = "-$name"
-            isMinifyEnabled = false
-            isShrinkResources = false
+        setOf("bt1", "bt2").forEach { name ->
+            create(name) {
+                initWith(getByName("debug"))
+                applicationIdSuffix = ".$name"
+                versionNameSuffix = "-$name"
+                isMinifyEnabled = false
+                isShrinkResources = false
+                signingConfig = signingConfigs.create(name) {
+                    storeFile = file("src/$name/$name.pkcs12")
+                    storePassword = "${name}1234"
+                    keyPassword = storePassword
+                    keyAlias = name
+                }
+            }
+        }
+        for (buildType in this) {
+            getByName(buildType.name) {
+//                manifestPlaceholders["buildType"] = name
+            }
         }
     }
 
@@ -51,17 +65,19 @@ android {
     productFlavors {
         "version".also { dimension ->
             flavorDimensions += dimension
-            create("foo") {
-                this.dimension = dimension
-                applicationIdSuffix = ".$name"
-                versionNameSuffix = "-$name"
-            }
-            create("bar") {
-                this.dimension = dimension
-                applicationIdSuffix = ".$name"
-                versionNameSuffix = "-$name"
+            setOf("pf1").forEach { name ->
+                create(name) {
+                    this.dimension = dimension
+                    applicationIdSuffix = ".$name"
+                    versionNameSuffix = "-$name"
+                }
             }
         }
+    }
+    applicationVariants.all {
+//        variant.mergedFlavor.manifestPlaceholders["buildType"] = variant.buildType
+//        variant.mergedFlavor.manifestPlaceholders["flavorName"] = variant.flavorName
+//        mergedFlavor.manifestPlaceholders["applicationId"] = applicationId
     }
 }
 

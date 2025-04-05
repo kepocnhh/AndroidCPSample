@@ -1,7 +1,4 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <permission android:name="test.android.cp.permission.provider"/>
-    <uses-permission android:name="test.android.cp.permission.provider"/>
-
     <application
         android:name=".App">
         <activity android:name=".MainActivity"

@@ -10,10 +10,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -28,6 +28,12 @@ internal fun MainScreen() {
     val logger = remember { App.loggers.create("[Main|Foo]") }
     val info = remember {
         context.packageManager.getPackageInfo(BuildConfig.APPLICATION_ID, PackageManager.GET_SIGNING_CERTIFICATES)
+    }
+    val apps = remember {
+        context.packageManager.getInstalledApplications(PackageManager.GET_META_DATA).sortedBy { it.packageName }
+    }
+    val packages = remember {
+        context.packageManager.getInstalledPackages(PackageManager.GET_PROVIDERS).sortedBy { it.packageName }
     }
     val md = remember { MessageDigest.getInstance("SHA1") }
     Box(
@@ -69,6 +75,38 @@ internal fun MainScreen() {
                     text = hex,
                     style = TextStyle(fontFamily = FontFamily.Monospace),
                 )
+            }
+            LazyColumn (
+                modifier = Modifier.fillMaxWidth().weight(1f),
+            ) {
+//                val list = apps
+                val list = packages
+                for (i in list.indices) {
+                    val it = list[i]
+                    if (!it.packageName.startsWith("test")) continue // todo
+                    val providers = it.providers ?: continue
+                    for (j in providers.indices) {
+                        val provider = providers[j]
+                        item(key = "$i/$j") {
+                            BasicText(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = "$i/$j:",
+                            )
+                            val text = """
+                                packageName: ${it.packageName}
+                                authority: ${provider.authority}
+                                readPermission: ${provider.readPermission}
+                                writePermission: ${provider.writePermission}
+                                grantUriPermissions: ${provider.grantUriPermissions}
+                                uriPermissionPatterns: ${provider.uriPermissionPatterns}
+                            """.trimIndent()
+                            BasicText(
+                                modifier = Modifier.fillMaxWidth(),
+                                text = text,
+                            )
+                        }
+                    }
+                }
             }
             BasicText(
                 modifier = Modifier

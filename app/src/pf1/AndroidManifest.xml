@@ -1,13 +1,13 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-<!--    <permission android:name="test.android.cp.permission.provider"/>-->
-    <uses-permission android:name="test.android.cp.permission.provider"/>
+    <permission android:name="${namespace}.${buildType}.provider.permission"
+        android:protectionLevel="signature"/>
+    <uses-permission android:name="${namespace}.${buildType}.provider.permission"/>
 
     <application
         android:label="CP/pf1">
         <provider
             android:name=".provider.FinalContentProvider"
-            android:authorities="${applicationId}.authority.provider"
-            android:exported="true"
-            android:permission="test.android.cp.permission.provider"/>
+            android:authorities="${applicationId}.provider.authority"
+            android:exported="true"/>
     </application>
 </manifest>

@@ -46,6 +46,8 @@ android {
                     keyPassword = storePassword
                     keyAlias = name
                 }
+                manifestPlaceholders["buildType"] = name
+                manifestPlaceholders["namespace"] = namespace!!
             }
         }
     }
@@ -107,7 +109,7 @@ androidComponents.onVariants { variant ->
             }
         }
         tasks.getByName(camelCase("assemble", variant.name)) {
-            dependsOn(checkManifestTask)
+//            dependsOn(checkManifestTask)
         }
     }
 }

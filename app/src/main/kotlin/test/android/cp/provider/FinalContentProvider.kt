@@ -2,19 +2,12 @@ package test.android.cp.provider
 
 import android.content.ContentProvider
 import android.content.ContentValues
-import android.content.UriMatcher
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
 import test.android.cp.BuildConfig
 
 internal class FinalContentProvider : ContentProvider() {
-    private val uriMatcher = UriMatcher(UriMatcher.NO_MATCH)
-
-    init {
-        uriMatcher.addURI("${BuildConfig.APPLICATION_ID}.authority.provider", "app", 1)
-    }
-
     override fun onCreate(): Boolean {
         return true
     }
@@ -26,14 +19,18 @@ internal class FinalContentProvider : ContentProvider() {
         selectionArgs: Array<out String>?,
         sortOrder: String?,
     ): Cursor? {
-        when (uriMatcher.match(uri)) {
-            1 -> {
-                val cursor = MatrixCursor(arrayOf("appId", "versionName"))
-                cursor.addRow(arrayOf(BuildConfig.APPLICATION_ID, BuildConfig.VERSION_NAME))
-                return cursor
+        when (uri.authority) {
+            "${BuildConfig.APPLICATION_ID}.provider.authority" -> {
+                when (uri.path) {
+                    "/app" -> {
+                        val cursor = MatrixCursor(arrayOf("appId", "versionName"))
+                        cursor.addRow(arrayOf(BuildConfig.APPLICATION_ID, BuildConfig.VERSION_NAME))
+                        return cursor
+                    }
+                }
             }
-            else -> error("No match uri $uri!")
         }
+        error("No match uri $uri!")
     }
 
     override fun getType(uri: Uri): String? {

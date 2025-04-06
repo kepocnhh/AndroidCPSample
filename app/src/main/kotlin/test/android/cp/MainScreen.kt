@@ -1,6 +1,8 @@
 package test.android.cp
 
 import android.content.pm.PackageManager
+import android.database.Cursor
+import android.net.Uri
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -20,6 +22,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import test.android.cp.util.map
+import test.android.cp.util.query
 import java.security.MessageDigest
 
 @Composable
@@ -62,20 +66,14 @@ internal fun MainScreen() {
                     .wrapContentHeight(),
                 text = "FLAVOR: ${BuildConfig.FLAVOR}",
             )
-            val signers = info.signingInfo!!.apkContentsSigners
-            for (i in signers.indices) {
-                BasicText(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = "$i/${signers.size - 1}:",
-                )
-                val bytes = signers[i].toByteArray()
-                val hex = md.digest(bytes).joinToString(separator = "") { String.format("%02x", it) }
-                BasicText(
-                    modifier = Modifier.fillMaxWidth(),
-                    text = hex,
-                    style = TextStyle(fontFamily = FontFamily.Monospace),
-                )
-            }
+            val signature = info.signingInfo?.apkContentsSigners?.single() ?: TODO()
+            val bytes = signature.toByteArray()
+            val hex = md.digest(bytes).joinToString(separator = "") { String.format("%02x", it) }
+            BasicText(
+                modifier = Modifier.fillMaxWidth(),
+                text = hex,
+                style = TextStyle(fontFamily = FontFamily.Monospace),
+            )
             LazyColumn (
                 modifier = Modifier.fillMaxWidth().weight(1f),
             ) {
@@ -87,18 +85,50 @@ internal fun MainScreen() {
                     val providers = it.providers ?: continue
                     for (j in providers.indices) {
                         val provider = providers[j]
+                        if (!provider.exported) continue
+                        if (!provider.enabled) continue
+//                        val readPermission = provider.readPermission ?: continue // todo
+                        if (BuildConfig.APPLICATION_ID == it.packageName) continue // todo
+                        val b = context.packageManager
+                            .getPackageInfo(it.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
+                            .signingInfo?.apkContentsSigners?.firstOrNull()?.toByteArray() ?: continue
+//                        if (!bytes.contentEquals(b)) continue // todo
+                        val h = md.digest(b).joinToString(separator = "") { String.format("%02x", it) }
+                        val authority = provider.authority ?: continue
+                        val uri = Uri.Builder()
+                            .scheme("content")
+                            .authority(authority)
+                            .appendPath("app")
+                            .build()
+//                        val appId: String? = null
+                        val appId = try {
+                            context.contentResolver.query(uri = uri, projection = arrayOf("appId")).use { cursor: Cursor? ->
+                                if (cursor == null) error("No cursor!")
+                                cursor.map {
+                                    it.getString(it.getColumnIndexOrThrow("appId"))
+                                }
+                            }.single()
+                        } catch (error: Throwable) {
+                            logger.warning("Query $authority error: $error")
+                            continue
+                        }
                         item(key = "$i/$j") {
                             BasicText(
                                 modifier = Modifier.fillMaxWidth(),
                                 text = "$i/$j:",
                             )
                             val text = """
-                                packageName: ${it.packageName}
-                                authority: ${provider.authority}
+                                appId: $appId
+                                pcg: ${it.packageName}
+                                sig: $h
+                                authority: $authority
+                                enabled: ${provider.enabled}
+                                exported: ${provider.exported}
                                 readPermission: ${provider.readPermission}
                                 writePermission: ${provider.writePermission}
                                 grantUriPermissions: ${provider.grantUriPermissions}
-                                uriPermissionPatterns: ${provider.uriPermissionPatterns}
+                                uriPermissionPatterns: ${provider.uriPermissionPatterns?.map { it.path }}
+                                pathPermissions: ${provider.pathPermissions?.map { it.path }}
                             """.trimIndent()
                             BasicText(
                                 modifier = Modifier.fillMaxWidth(),

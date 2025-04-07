@@ -6,6 +6,7 @@ import androidx.compose.runtime.collectAsState
 import test.android.cp.App
 import test.android.cp.module.auth.AuthScreen
 import test.android.cp.module.enter.EnterScreen
+import test.android.cp.module.main.MainScreen
 
 @Composable
 internal fun RouterScreen() {
@@ -17,7 +18,9 @@ internal fun RouterScreen() {
     when (state) {
         is RouterLogics.State.Keys -> {
             if (state.authorized) {
-                TODO("RouterScreen:state: $state")
+                MainScreen(
+                    onLock = logics::lock,
+                )
             } else {
                 EnterScreen(
                     onEnter = logics::enter,

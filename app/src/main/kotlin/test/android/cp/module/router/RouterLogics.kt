@@ -64,4 +64,15 @@ internal class RouterLogics(
         }
         _states.value = State.Keys(publicKey = keys.publicKey, authorized = true)
     }
+
+    fun lock() = launch {
+        val keys = withContext(injection.contexts.default) {
+            injection.locals.keys
+        }
+        if (keys == null) TODO()
+        withContext(injection.contexts.default) {
+            injection.sessions.privateKey = null
+        }
+        _states.value = State.Keys(publicKey = keys.publicKey, authorized = false)
+    }
 }

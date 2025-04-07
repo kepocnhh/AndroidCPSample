@@ -20,7 +20,7 @@ internal class FinalContentProvider : ContentProvider() {
         sortOrder: String?,
     ): Cursor? {
         when (uri.authority) {
-            "${BuildConfig.APPLICATION_ID}.provider.authority" -> {
+            BuildConfig.PROVIDER_AUTHORITY -> {
                 when (uri.path) {
                     "/app" -> {
                         val cursor = MatrixCursor(arrayOf("appId", "versionName"))

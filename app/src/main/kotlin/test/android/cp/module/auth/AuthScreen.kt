@@ -1,5 +1,7 @@
 package test.android.cp.module.auth
 
+import android.content.Context
+import android.content.pm.PackageManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -9,6 +11,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
@@ -20,8 +23,25 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import test.android.cp.App
+import test.android.cp.BuildConfig
 import test.android.cp.entity.Keys
 import test.android.cp.util.showToast
+
+private fun getAuthorities(context: Context): Set<String> {
+    val result = mutableSetOf<String>()
+    val packages = context.packageManager.getInstalledPackages(PackageManager.GET_PROVIDERS)
+    for (pcg in packages) {
+        val providers = pcg.providers ?: continue
+        for (provider in providers) {
+            if (!provider.exported) continue
+            if (!provider.enabled) continue
+            if (BuildConfig.APPLICATION_ID == pcg.packageName) continue
+            if (provider.readPermission != BuildConfig.PROVIDER_PERMISSION) continue
+            result += provider.authority
+        }
+    }
+    return result
+}
 
 @Composable
 internal fun AuthScreen(
@@ -103,6 +123,23 @@ internal fun AuthScreen(
                     .wrapContentSize(),
                 text = "auth",
             )
+            val authorities = remember { getAuthorities(context = context) }
+            LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
+                authorities.forEach { authority ->
+                    item(key = authority) {
+                        BasicText(
+                            modifier = Modifier.fillMaxWidth()
+                                .height(48.dp)
+                                .background(Color.Yellow)
+                                .clickable {
+                                    // todo
+                                }
+                                .wrapContentHeight(),
+                            text = authority,
+                        )
+                    }
+                }
+            }
         }
     }
 }

@@ -22,7 +22,7 @@
         </activity>
         <provider
             android:name=".provider.FinalContentProvider"
-            android:authorities="${applicationId}.provider.authority"
+            android:authorities="${provider_authority}"
             android:enabled="true"
             android:exported="true"
             android:readPermission="${provider_permission}"/>

@@ -75,6 +75,9 @@ android {
     }
     applicationVariants.all {
         mergedFlavor.manifestPlaceholders["app_name"] = "$name/${rootProject.name}"
+        val pa = "${applicationId}.provider.authority"
+        mergedFlavor.manifestPlaceholders["provider_authority"] = pa
+        buildConfigField("String", "PROVIDER_AUTHORITY", "\"$pa\"")
     }
 }
 

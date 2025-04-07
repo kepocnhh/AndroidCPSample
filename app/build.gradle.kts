@@ -41,13 +41,14 @@ android {
                 isMinifyEnabled = false
                 isShrinkResources = false
                 signingConfig = signingConfigs.create(name) {
-                    storeFile = file("src/$name/$name.pkcs12")
+                    storeFile = file("src/$name.pkcs12")
                     storePassword = "${name}1234"
                     keyPassword = storePassword
                     keyAlias = name
                 }
-                manifestPlaceholders["buildType"] = name
-                manifestPlaceholders["namespace"] = namespace!!
+                val pp = "${namespace}.${name}.provider.permission"
+                manifestPlaceholders["provider_permission"] = pp
+                buildConfigField("String", "PROVIDER_PERMISSION", "\"$pp\"")
             }
         }
     }
@@ -70,6 +71,9 @@ android {
                 }
             }
         }
+    }
+    applicationVariants.all {
+        mergedFlavor.manifestPlaceholders["app_name"] = "$name/${rootProject.name}"
     }
 }
 

@@ -49,28 +49,18 @@ internal fun MainScreen() {
             modifier = Modifier.fillMaxSize(),
         ) {
             BasicText(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight(),
                 text = "APPLICATION_ID: ${BuildConfig.APPLICATION_ID}",
             )
             BasicText(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight(),
                 text = "BUILD_TYPE: ${BuildConfig.BUILD_TYPE}",
             )
             BasicText(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .wrapContentHeight(),
                 text = "FLAVOR: ${BuildConfig.FLAVOR}",
             )
             val signature = info.signingInfo?.apkContentsSigners?.single() ?: TODO()
             val bytes = signature.toByteArray()
             val hex = md.digest(bytes).joinToString(separator = "") { String.format("%02x", it) }
             BasicText(
-                modifier = Modifier.fillMaxWidth(),
                 text = hex,
                 style = TextStyle(fontFamily = FontFamily.Monospace),
             )
@@ -81,13 +71,14 @@ internal fun MainScreen() {
                 val list = packages
                 for (i in list.indices) {
                     val it = list[i]
-                    if (!it.packageName.startsWith("test")) continue // todo
+//                    if (!it.packageName.startsWith("test")) continue // todo
                     val providers = it.providers ?: continue
                     for (j in providers.indices) {
                         val provider = providers[j]
                         if (!provider.exported) continue
                         if (!provider.enabled) continue
 //                        val readPermission = provider.readPermission ?: continue // todo
+                        if (provider.readPermission != BuildConfig.PROVIDER_PERMISSION) continue
                         if (BuildConfig.APPLICATION_ID == it.packageName) continue // todo
                         val b = context.packageManager
                             .getPackageInfo(it.packageName, PackageManager.GET_SIGNING_CERTIFICATES)
@@ -113,10 +104,7 @@ internal fun MainScreen() {
                             continue
                         }
                         item(key = "$i/$j") {
-                            BasicText(
-                                modifier = Modifier.fillMaxWidth(),
-                                text = "$i/$j:",
-                            )
+                            BasicText(text = "$i/$j:")
                             val text = """
                                 appId: $appId
                                 pcg: ${it.packageName}
@@ -130,10 +118,7 @@ internal fun MainScreen() {
                                 uriPermissionPatterns: ${provider.uriPermissionPatterns?.map { it.path }}
                                 pathPermissions: ${provider.pathPermissions?.map { it.path }}
                             """.trimIndent()
-                            BasicText(
-                                modifier = Modifier.fillMaxWidth(),
-                                text = text,
-                            )
+                            BasicText(text = text)
                         }
                     }
                 }

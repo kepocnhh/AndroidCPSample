@@ -1,10 +1,16 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <permission android:name="${provider_permission}"
+        android:protectionLevel="signature"/>
+    <uses-permission android:name="${provider_permission}"/>
+
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
         </intent>
     </queries>
+
     <application
+        android:label="${app_name}"
         android:name=".App">
         <activity android:name=".MainActivity"
             android:screenOrientation="portrait"
@@ -14,5 +20,11 @@
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
         </activity>
+        <provider
+            android:name=".provider.FinalContentProvider"
+            android:authorities="${applicationId}.provider.authority"
+            android:enabled="true"
+            android:exported="true"
+            android:readPermission="${provider_permission}"/>
     </application>
 </manifest>

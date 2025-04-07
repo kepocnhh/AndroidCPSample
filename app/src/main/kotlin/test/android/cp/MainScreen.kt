@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.BasicText
@@ -32,9 +31,6 @@ internal fun MainScreen() {
     val logger = remember { App.loggers.create("[Main|Foo]") }
     val info = remember {
         context.packageManager.getPackageInfo(BuildConfig.APPLICATION_ID, PackageManager.GET_SIGNING_CERTIFICATES)
-    }
-    val apps = remember {
-        context.packageManager.getInstalledApplications(PackageManager.GET_META_DATA).sortedBy { it.packageName }
     }
     val packages = remember {
         context.packageManager.getInstalledPackages(PackageManager.GET_PROVIDERS).sortedBy { it.packageName }

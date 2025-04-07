@@ -12,6 +12,7 @@ repositories {
     google()
     mavenCentral()
     maven("https://maven.pkg.jetbrains.space/public/p/compose/dev")
+    maven("https://s01.oss.sonatype.org/content/repositories/snapshots")
 }
 
 plugins {
@@ -63,7 +64,7 @@ android {
     productFlavors {
         "version".also { dimension ->
             flavorDimensions += dimension
-            setOf("pf1", "pf2").forEach { name ->
+            setOf("pf1", "pf2", "pf3").forEach { name ->
                 create(name) {
                     this.dimension = dimension
                     applicationIdSuffix = ".$name"
@@ -113,7 +114,7 @@ androidComponents.onVariants { variant ->
             }
         }
         tasks.getByName(camelCase("assemble", variant.name)) {
-//            dependsOn(checkManifestTask)
+//            dependsOn(checkManifestTask) // todo
         }
     }
 }
@@ -121,4 +122,6 @@ androidComponents.onVariants { variant ->
 dependencies {
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation(compose.foundation)
+    implementation("com.github.kepocnhh:Bytes:0.2.1-SNAPSHOT")
+    implementation("com.github.kepocnhh:Logics:0.1.3-SNAPSHOT")
 }

@@ -26,5 +26,10 @@
             android:enabled="true"
             android:exported="true"
             android:readPermission="${provider_permission}"/>
+        <activity android:name=".module.enter.EnterActivity"
+            android:screenOrientation="portrait"
+            android:enabled="true"
+            android:exported="true"
+            android:permission="${provider_permission}"/>
     </application>
 </manifest>

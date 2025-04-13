@@ -1,7 +1,13 @@
 package test.android.cp.module.auth
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -26,6 +32,7 @@ import test.android.cp.App
 import test.android.cp.BuildConfig
 import test.android.cp.entity.Keys
 import test.android.cp.util.showToast
+import androidx.core.net.toUri
 
 private fun getAuthorities(context: Context): Set<String> {
     val result = mutableSetOf<String>()
@@ -38,6 +45,24 @@ private fun getAuthorities(context: Context): Set<String> {
             if (BuildConfig.APPLICATION_ID == pcg.packageName) continue
             if (provider.readPermission != BuildConfig.PROVIDER_PERMISSION) continue
             result += provider.authority
+        }
+    }
+    return result
+}
+
+private fun getActivities(context: Context): Map<String, Set<String>> {
+    val result = mutableMapOf<String, MutableSet<String>>()
+    val packages = context.packageManager.getInstalledPackages(PackageManager.GET_ACTIVITIES)
+    for (pcg in packages) {
+//        println("[Foo]${pcg.packageName}: activities: ${pcg.activities?.toList()}")
+        val activities = pcg.activities ?: continue
+        for (activity in activities) {
+//            println("[Foo]${pcg.packageName}: activity: ${activity.name}")
+            if (!activity.exported) continue
+            if (!activity.enabled) continue
+            if (BuildConfig.APPLICATION_ID == pcg.packageName) continue
+            if (activity.permission != BuildConfig.PROVIDER_PERMISSION) continue
+            result.getOrPut(pcg.packageName, ::HashSet) += activity.name ?: continue
         }
     }
     return result
@@ -71,6 +96,9 @@ internal fun AuthScreen(
     val passwordState = remember { mutableStateOf("qwe202") } // todo
     val aliasState = remember { mutableStateOf("a202") } // todo
     val pinState = remember { mutableStateOf("0202") } // todo
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { output ->
+        logger.debug("result: ${output.resultCode}\nanswer: ${output.data?.getStringExtra("answer")}")
+    }
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxWidth()) {
             BasicText("file")
@@ -123,20 +151,26 @@ internal fun AuthScreen(
                     .wrapContentSize(),
                 text = "auth",
             )
-            val authorities = remember { getAuthorities(context = context) }
+//            val authorities = remember { getAuthorities(context = context) }
+            val packages = remember { getActivities(context = context) }
             LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                authorities.forEach { authority ->
-                    item(key = authority) {
-                        BasicText(
-                            modifier = Modifier.fillMaxWidth()
-                                .height(48.dp)
-                                .background(Color.Yellow)
-                                .clickable {
-                                    // todo
-                                }
-                                .wrapContentHeight(),
-                            text = authority,
-                        )
+                packages.forEach { (pcg, activities) ->
+                    activities.forEach { activity ->
+                        item(key = "$pcg:$activity") {
+                            BasicText(
+                                modifier = Modifier.fillMaxWidth()
+                                    .height(48.dp)
+                                    .background(Color.Yellow)
+                                    .clickable {
+                                        val intent = Intent()
+                                        intent.setComponent(ComponentName(pcg, activity))
+                                        intent.putExtra("issuer", BuildConfig.APPLICATION_ID)
+                                        launcher.launch(intent)
+                                    }
+                                    .wrapContentHeight(),
+                                text = "$pcg\n$activity",
+                            )
+                        }
                     }
                 }
             }

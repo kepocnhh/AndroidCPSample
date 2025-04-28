@@ -1,6 +1,9 @@
 package test.android.cp.module.auth
 
+import android.content.ComponentName
 import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
@@ -37,6 +40,49 @@ import test.android.cp.util.query
 import test.android.cp.util.showToast
 import test.android.cp.util.single
 
+private fun PackageInfo.getPublicKey(
+    context: Context,
+    logger: Logger,
+    secrets: Secrets,
+): ByteArray? {
+    for (provider in providers ?: return null) {
+        if (!provider.exported) continue
+        if (!provider.enabled) continue
+        if (BuildConfig.APPLICATION_ID == packageName) continue
+        if (provider.readPermission != BuildConfig.PROVIDER_PERMISSION) continue
+        val authority = provider.authority ?: continue
+        val uri = Uri.Builder()
+            .scheme("content")
+            .authority(authority)
+            .appendPath("getPublicKey")
+            .build()
+        val value = try {
+            context.contentResolver.query(uri = uri).use { cursor: Cursor? ->
+                if (cursor == null) error("No cursor!")
+                cursor.single {
+                    it.getString(it.getColumnIndexOrThrow("publicKey"))
+                }
+            }
+        } catch (error: Throwable) {
+            logger.warning("Query $authority error: $error")
+            continue
+        }
+        return secrets.base64(value)
+    }
+    return null
+}
+
+private fun PackageInfo.getActivity(): String? {
+    for (activity in activities ?: return null) {
+        if (!activity.exported) continue
+        if (!activity.enabled) continue
+        if (BuildConfig.APPLICATION_ID == packageName) continue
+        if (activity.permission != BuildConfig.PROVIDER_PERMISSION) continue
+        return activity.name ?: continue
+    }
+    return null
+}
+
 private fun getAuthorizedPackages(
     context: Context,
     logger: Logger,
@@ -46,32 +92,14 @@ private fun getAuthorizedPackages(
     val packages = context.packageManager.getInstalledPackages(PackageManager.GET_PROVIDERS or PackageManager.GET_ACTIVITIES)
 //    logger.debug("packages: ${packages.sortedBy { it.packageName }.joinToString(separator = "\n") { it.packageName }}")
     for (pcg in packages) {
-        val providers = pcg.providers ?: continue
-        for (provider in providers) {
-            if (!provider.exported) continue
-            if (!provider.enabled) continue
-            if (BuildConfig.APPLICATION_ID == pcg.packageName) continue
-            if (provider.readPermission != BuildConfig.PROVIDER_PERMISSION) continue
-            val authority = provider.authority ?: continue
-            val uri = Uri.Builder()
-                .scheme("content")
-                .authority(authority)
-                .appendPath("getPublicKey")
-                .build()
-            val publicKey = try {
-                context.contentResolver.query(uri = uri).use { cursor: Cursor? ->
-                    if (cursor == null) error("No cursor!")
-                    cursor.single {
-                        secrets.base64(it.getString(it.getColumnIndexOrThrow("publicKey")))
-                    }
-                }
-            } catch (error: Throwable) {
-                logger.warning("Query $authority error: $error")
-                continue
-            }
-            logger.debug("pcg: ${pcg.packageName}\npublic key: ${secrets.sha256(publicKey).toHEX()}")
-            result.add(AuthorizedPackage(name = pcg.packageName, authority = authority, publicKey = publicKey))
-        }
+        val publicKey = pcg.getPublicKey(context, logger, secrets) ?: continue
+        val activity = pcg.getActivity() ?: continue
+        val ap = AuthorizedPackage(
+            name = pcg.packageName,
+            activity = activity,
+            publicKey = publicKey,
+        )
+        result.add(ap)
     }
     return result
 }
@@ -197,23 +225,22 @@ internal fun AuthScreen(
             )
             val aps = remember { getAuthorizedPackages(context = context, logger = logger, secrets = secrets) }
             LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                aps.forEach {
-                    item(key = it.authority) {
+                aps.forEachIndexed { index, it ->
+                    item(key = "$index/${it.name}") {
                         val text = """
                             pcg: ${it.name}
-                            authority: ${it.authority}
+                            activity: ${it.activity}
                             public key: ${secrets.sha256(it.publicKey).toHEX()}
                         """.trimIndent()
                         BasicText(
                             modifier = Modifier.fillMaxWidth()
-                                .height(48.dp)
                                 .background(Color.Yellow)
                                 .clickable {
-//                                    logger.debug("launch $pcg $activity")
-//                                    val intent = Intent()
-//                                    intent.setComponent(ComponentName(pcg, activity))
-//                                    intent.putExtra("issuer", BuildConfig.APPLICATION_ID)
-//                                    launcher.launch(intent)
+                                    logger.debug("launch ${it.name} ${it.activity}")
+                                    val intent = Intent()
+                                    intent.setComponent(ComponentName(it.name, it.activity))
+                                    intent.putExtra("issuer", BuildConfig.APPLICATION_ID) // todo
+                                    launcher.launch(intent)
                                 }
                                 .wrapContentHeight(),
                             text = text,

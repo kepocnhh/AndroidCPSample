@@ -9,4 +9,6 @@ internal interface Secrets {
     fun decrypt(key: SecretKey, encrypted: ByteArray): ByteArray
     fun toKeyStore(encoded: ByteArray, password: CharArray): KeyStore
     fun encrypt(key: SecretKey, decrypted: ByteArray): ByteArray
+    fun base64(text: String): ByteArray
+    fun base64(bytes: ByteArray): String
 }

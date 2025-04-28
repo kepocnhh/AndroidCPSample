@@ -1,5 +1,6 @@
 package test.android.cp.provider
 
+import android.util.Base64
 import java.security.KeyStore
 import java.security.MessageDigest
 import javax.crypto.Cipher
@@ -36,5 +37,13 @@ internal class FinalSecrets : Secrets {
         val cipher = Cipher.getInstance("AES")
         cipher.init(Cipher.ENCRYPT_MODE, key)
         return cipher.doFinal(decrypted)
+    }
+
+    override fun base64(text: String): ByteArray {
+        return Base64.decode(text, Base64.DEFAULT)
+    }
+
+    override fun base64(bytes: ByteArray): String {
+        return Base64.encodeToString(bytes, Base64.DEFAULT)
     }
 }

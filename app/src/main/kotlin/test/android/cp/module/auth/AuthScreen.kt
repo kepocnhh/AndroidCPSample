@@ -1,12 +1,10 @@
 package test.android.cp.module.auth
 
-import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
+import android.database.Cursor
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -21,19 +19,62 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import sp.kx.bytes.toHEX
 import test.android.cp.App
 import test.android.cp.BuildConfig
+import test.android.cp.entity.AuthorizedPackage
 import test.android.cp.entity.Keys
+import test.android.cp.provider.Logger
+import test.android.cp.provider.Secrets
+import test.android.cp.util.query
 import test.android.cp.util.showToast
-import androidx.core.net.toUri
-import sp.kx.bytes.toHEX
+import test.android.cp.util.single
+
+private fun getAuthorizedPackages(
+    context: Context,
+    logger: Logger,
+    secrets: Secrets,
+): List<AuthorizedPackage> {
+    val result = mutableListOf<AuthorizedPackage>()
+    val packages = context.packageManager.getInstalledPackages(PackageManager.GET_PROVIDERS or PackageManager.GET_ACTIVITIES)
+//    logger.debug("packages: ${packages.sortedBy { it.packageName }.joinToString(separator = "\n") { it.packageName }}")
+    for (pcg in packages) {
+        val providers = pcg.providers ?: continue
+        for (provider in providers) {
+            if (!provider.exported) continue
+            if (!provider.enabled) continue
+            if (BuildConfig.APPLICATION_ID == pcg.packageName) continue
+            if (provider.readPermission != BuildConfig.PROVIDER_PERMISSION) continue
+            val authority = provider.authority ?: continue
+            val uri = Uri.Builder()
+                .scheme("content")
+                .authority(authority)
+                .appendPath("getPublicKey")
+                .build()
+            val publicKey = try {
+                context.contentResolver.query(uri = uri).use { cursor: Cursor? ->
+                    if (cursor == null) error("No cursor!")
+                    cursor.single {
+                        secrets.base64(it.getString(it.getColumnIndexOrThrow("publicKey")))
+                    }
+                }
+            } catch (error: Throwable) {
+                logger.warning("Query $authority error: $error")
+                continue
+            }
+            logger.debug("pcg: ${pcg.packageName}\npublic key: ${secrets.sha256(publicKey).toHEX()}")
+            result.add(AuthorizedPackage(name = pcg.packageName, authority = authority, publicKey = publicKey))
+        }
+    }
+    return result
+}
 
 private fun getAuthorities(context: Context): Set<String> {
     val result = mutableSetOf<String>()
@@ -74,7 +115,8 @@ internal fun AuthScreen(
     onAuth: (Keys, ByteArray) -> Unit,
 ) {
     val context = LocalContext.current
-    val logger = remember { App.loggers.create("[Auth]") }
+    val logger = remember { App.injection.loggers.create("[Auth]") }
+    val secrets = remember { App.injection.secrets }
     val logics = App.logics<AuthLogics>()
     LaunchedEffect(Unit) {
         logics.events.collect { event ->
@@ -153,27 +195,29 @@ internal fun AuthScreen(
                     .wrapContentSize(),
                 text = "auth",
             )
-//            val authorities = remember { getAuthorities(context = context) }
-            val packages = remember { getActivities(context = context) }
+            val aps = remember { getAuthorizedPackages(context = context, logger = logger, secrets = secrets) }
             LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                packages.forEach { (pcg, activities) ->
-                    activities.forEach { activity ->
-                        item(key = "$pcg:$activity") {
-                            BasicText(
-                                modifier = Modifier.fillMaxWidth()
-                                    .height(48.dp)
-                                    .background(Color.Yellow)
-                                    .clickable {
-                                        logger.debug("launch $pcg $activity")
-                                        val intent = Intent()
-                                        intent.setComponent(ComponentName(pcg, activity))
-                                        intent.putExtra("issuer", BuildConfig.APPLICATION_ID)
-                                        launcher.launch(intent)
-                                    }
-                                    .wrapContentHeight(),
-                                text = "$pcg\n$activity",
-                            )
-                        }
+                aps.forEach {
+                    item(key = it.authority) {
+                        val text = """
+                            pcg: ${it.name}
+                            authority: ${it.authority}
+                            public key: ${secrets.sha256(it.publicKey).toHEX()}
+                        """.trimIndent()
+                        BasicText(
+                            modifier = Modifier.fillMaxWidth()
+                                .height(48.dp)
+                                .background(Color.Yellow)
+                                .clickable {
+//                                    logger.debug("launch $pcg $activity")
+//                                    val intent = Intent()
+//                                    intent.setComponent(ComponentName(pcg, activity))
+//                                    intent.putExtra("issuer", BuildConfig.APPLICATION_ID)
+//                                    launcher.launch(intent)
+                                }
+                                .wrapContentHeight(),
+                            text = text,
+                        )
                     }
                 }
             }

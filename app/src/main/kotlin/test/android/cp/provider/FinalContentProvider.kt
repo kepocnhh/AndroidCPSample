@@ -5,6 +5,7 @@ import android.content.ContentValues
 import android.database.Cursor
 import android.database.MatrixCursor
 import android.net.Uri
+import test.android.cp.App
 import test.android.cp.BuildConfig
 
 internal class FinalContentProvider : ContentProvider() {
@@ -22,9 +23,10 @@ internal class FinalContentProvider : ContentProvider() {
         when (uri.authority) {
             BuildConfig.PROVIDER_AUTHORITY -> {
                 when (uri.path) {
-                    "/app" -> {
-                        val cursor = MatrixCursor(arrayOf("appId", "versionName"))
-                        cursor.addRow(arrayOf(BuildConfig.APPLICATION_ID, BuildConfig.VERSION_NAME))
+                    "/getPublicKey" -> {
+                        val publicKey = App.injection.locals.keys?.publicKey ?: error("No public key!")
+                        val cursor = MatrixCursor(arrayOf("publicKey"))
+                        cursor.addRow(arrayOf(App.injection.secrets.base64(publicKey)))
                         return cursor
                     }
                 }

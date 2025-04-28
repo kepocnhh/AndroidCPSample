@@ -1,6 +1,7 @@
 package test.android.cp
 
 import android.app.Application
+import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -18,30 +19,28 @@ import test.android.cp.provider.FinalLoggers
 import test.android.cp.provider.FinalSecrets
 import test.android.cp.provider.Injection
 import test.android.cp.provider.Logger
+import test.android.cp.provider.Secrets
 import test.android.cp.provider.Sessions
 
 internal class App : Application() {
-    override fun onCreate() {
-        super.onCreate()
-        val loggers = FinalLoggers()
-        _loggers = loggers
+    override fun attachBaseContext(base: Context?) {
+        super.attachBaseContext(base)
+        val loggers: Logger.Factory = FinalLoggers()
+        val secrets: Secrets = FinalSecrets()
         _injection = Injection(
             contexts = Contexts(
                 main = Dispatchers.Main,
                 default = Dispatchers.Default,
             ),
             loggers = loggers,
-            locals = FinalLocals(context = this),
+            locals = FinalLocals(context = this, secrets = secrets),
             sessions = Sessions(privateKey = null),
-            secrets = FinalSecrets(),
+            secrets = secrets,
             assets = FinalAssets(context = this),
         )
     }
 
     companion object {
-        private var _loggers: Logger.Factory? = null
-        val loggers: Logger.Factory get() = checkNotNull(_loggers) { "No loggers!" }
-
         private var _injection: Injection? = null
         val injection: Injection get() = checkNotNull(_injection) { "No injection!" }
 

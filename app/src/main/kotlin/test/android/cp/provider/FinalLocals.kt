@@ -2,11 +2,13 @@ package test.android.cp.provider
 
 import android.content.Context
 import android.content.SharedPreferences
-import android.util.Base64
 import test.android.cp.BuildConfig
 import test.android.cp.entity.Keys
 
-internal class FinalLocals(context: Context) : Locals {
+internal class FinalLocals(
+    context: Context,
+    private val secrets: Secrets,
+) : Locals {
     private val prefs = context.getSharedPreferences(BuildConfig.APPLICATION_ID, Context.MODE_PRIVATE)
 
     override var keys: Keys?
@@ -33,14 +35,12 @@ internal class FinalLocals(context: Context) : Locals {
             }
         }
 
-    companion object {
-        private fun SharedPreferences.Editor.putString(key: String, bytes: ByteArray): SharedPreferences.Editor {
-            return putString(key, Base64.encodeToString(bytes, Base64.DEFAULT))
-        }
+    private fun SharedPreferences.Editor.putString(key: String, bytes: ByteArray): SharedPreferences.Editor {
+        return putString(key, secrets.base64(bytes = bytes))
+    }
 
-        private fun SharedPreferences.getBytes(key: String): ByteArray {
-            val text = getString(key, null) ?: error("No \"$key\"!")
-            return Base64.decode(text, Base64.DEFAULT)
-        }
+    private fun SharedPreferences.getBytes(key: String): ByteArray {
+        val text = getString(key, null) ?: error("No \"$key\"!")
+        return secrets.base64(text = text)
     }
 }

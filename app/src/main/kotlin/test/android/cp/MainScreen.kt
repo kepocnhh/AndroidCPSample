@@ -28,7 +28,7 @@ import java.security.MessageDigest
 @Composable
 internal fun MainScreen() {
     val context = LocalContext.current
-    val logger = remember { App.loggers.create("[Main|Foo]") }
+    val logger = remember { App.injection.loggers.create("[Main|Foo]") }
     val info = remember {
         context.packageManager.getPackageInfo(BuildConfig.APPLICATION_ID, PackageManager.GET_SIGNING_CERTIFICATES)
     }

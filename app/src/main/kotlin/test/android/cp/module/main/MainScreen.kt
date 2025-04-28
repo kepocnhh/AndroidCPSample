@@ -20,7 +20,7 @@ internal fun MainScreen(
     onLock: () -> Unit,
 ) {
     val context = LocalContext.current
-    val logger = remember { App.loggers.create("[Main]") }
+    val logger = remember { App.injection.loggers.create("[Main]") }
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxWidth()) {
             BasicText(

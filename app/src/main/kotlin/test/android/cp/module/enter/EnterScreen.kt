@@ -28,7 +28,7 @@ internal fun EnterScreen(
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current
-    val logger = remember { App.loggers.create("[Enter]") }
+    val logger = remember { App.injection.loggers.create("[Enter]") }
     val logics = App.logics<EnterLogics>()
     LaunchedEffect(Unit) {
         logics.events.collect { event ->

@@ -20,12 +20,13 @@ internal class EnterLogics(
     private val logger = injection.loggers.create("[Enter]")
 
     fun enter(pin: String) = launch {
+        logger.debug("enter($pin)...")
         val result = withContext(injection.contexts.default) {
             runCatching {
                 if (pin.isBlank()) error("PIN is blank!")
                 val secretKey = injection.secrets.getSecretKey(password = pin.toCharArray())
                 logger.debug("secret:key: ${injection.secrets.sha256(secretKey.encoded).toHEX()}")
-                val keys = injection.locals.keys ?: TODO()
+                val keys = injection.locals.keys ?: TODO("No local keys!")
                 val decrypted = injection.secrets.decrypt(secretKey, keys.privateKeyEncrypted)
                 logger.debug("private:key: ${injection.secrets.sha256(decrypted).toHEX()}")
                 decrypted

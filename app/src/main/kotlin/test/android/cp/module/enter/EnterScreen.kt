@@ -61,6 +61,7 @@ internal fun EnterScreen(
                 modifier = Modifier.fillMaxWidth()
                     .height(64.dp)
                     .clickable {
+                        logger.debug("enter...")
                         logics.enter(pin = pinState.value)
                     }
                     .wrapContentSize(),

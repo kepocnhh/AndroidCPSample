@@ -33,6 +33,7 @@ import test.android.cp.BuildConfig
 import test.android.cp.entity.Keys
 import test.android.cp.util.showToast
 import androidx.core.net.toUri
+import sp.kx.bytes.toHEX
 
 private fun getAuthorities(context: Context): Set<String> {
     val result = mutableSetOf<String>()
@@ -97,7 +98,8 @@ internal fun AuthScreen(
     val aliasState = remember { mutableStateOf("a202") } // todo
     val pinState = remember { mutableStateOf("0202") } // todo
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { output ->
-        logger.debug("result: ${output.resultCode}\nanswer: ${output.data?.getStringExtra("answer")}")
+        val bytes = output.data?.getByteArrayExtra("bytes")
+        logger.debug("result: ${output.resultCode}\nbytes: ${bytes?.let(App.injection.secrets::sha256)?.toHEX()}")
     }
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -162,6 +164,7 @@ internal fun AuthScreen(
                                     .height(48.dp)
                                     .background(Color.Yellow)
                                     .clickable {
+                                        logger.debug("launch $pcg $activity")
                                         val intent = Intent()
                                         intent.setComponent(ComponentName(pcg, activity))
                                         intent.putExtra("issuer", BuildConfig.APPLICATION_ID)

@@ -7,6 +7,9 @@ import android.database.MatrixCursor
 import android.net.Uri
 import test.android.cp.App
 import test.android.cp.BuildConfig
+import test.android.cp.entity.EnterSalt
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 internal class FinalContentProvider : ContentProvider() {
     override fun onCreate(): Boolean {
@@ -22,11 +25,26 @@ internal class FinalContentProvider : ContentProvider() {
     ): Cursor? {
         when (uri.authority) {
             BuildConfig.PROVIDER_AUTHORITY -> {
+                val injection = App.injection
                 when (uri.path) {
                     "/getPublicKey" -> {
-                        val publicKey = App.injection.locals.keys?.publicKey ?: error("No public key!")
+                        val publicKey = injection.locals.keys?.publicKey ?: error("No public key!")
                         val cursor = MatrixCursor(arrayOf("publicKey"))
-                        cursor.addRow(arrayOf(App.injection.secrets.base64(publicKey)))
+                        cursor.addRow(arrayOf(injection.secrets.toBase64String(publicKey)))
+                        return cursor
+                    }
+                    "/putSalt" -> {
+                        val time = uri.getQueryParameter("time")?.toLongOrNull()?.milliseconds ?: error("No time!")
+                        if (injection.times.now() - time > 30.seconds) error("Wrong time!")
+                        val encryptedSalt = uri.getQueryParameter("encryptedSalt")?.let(injection.secrets::fromBase64) ?: error("No encrypted salt!")
+                        val signature = uri.getQueryParameter("signature")?.let(injection.secrets::fromBase64) ?: error("No signature!")
+                        injection.sessions.enterSalt = EnterSalt(
+                            time = time,
+                            encryptedSalt = encryptedSalt,
+                            signature = signature,
+                        )
+                        val cursor = MatrixCursor(arrayOf("code"))
+                        cursor.addRow(arrayOf(200))
                         return cursor
                     }
                 }

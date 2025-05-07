@@ -19,6 +19,7 @@ internal fun RouterScreen() {
         is RouterLogics.State.Keys -> {
             if (state.authorized) {
                 MainScreen(
+                    publicKey = state.publicKey,
                     onLock = logics::lock,
                 )
             } else {

@@ -7,4 +7,5 @@ internal data class Injection(
     val sessions: Sessions,
     val secrets: Secrets,
     val assets: Assets,
+    val times: Times,
 )

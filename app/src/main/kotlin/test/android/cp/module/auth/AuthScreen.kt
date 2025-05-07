@@ -8,6 +8,7 @@ import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,6 +31,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import sp.kx.bytes.toHEX
+import sp.kx.bytes.write
 import test.android.cp.App
 import test.android.cp.BuildConfig
 import test.android.cp.entity.AuthorizedPackage
@@ -39,6 +41,8 @@ import test.android.cp.provider.Secrets
 import test.android.cp.util.query
 import test.android.cp.util.showToast
 import test.android.cp.util.single
+import java.util.Date
+import java.util.UUID
 
 private fun PackageInfo.getPublicKey(
     context: Context,
@@ -67,7 +71,7 @@ private fun PackageInfo.getPublicKey(
             logger.warning("Query $authority error: $error")
             continue
         }
-        return secrets.base64(value)
+        return secrets.fromBase64(value)
     }
     return null
 }
@@ -138,6 +142,37 @@ private fun getActivities(context: Context): Map<String, Set<String>> {
     return result
 }
 
+private fun onEnter(
+    logger: Logger,
+    authorizedPackage: AuthorizedPackage,
+    launcher: ActivityResultLauncher<Intent>,
+) {
+    val injection = App.injection
+    val intent = Intent()
+    intent.setComponent(ComponentName(authorizedPackage.name, authorizedPackage.activity))
+    val authority = BuildConfig.PROVIDER_AUTHORITY
+    logger.debug("authority: $authority")
+    val authorityEncoded = injection.secrets.toBase64(authority)
+    val payload = ByteArray(4 + authorityEncoded.size + 8 + 16)
+    var index = 0
+    payload.write(index = index, authorityEncoded.size)
+    index += 4
+    System.arraycopy(authorityEncoded, 0, payload, index, authorityEncoded.size)
+    index += authorityEncoded.size
+    val time = injection.times.now()
+    logger.debug("request time: ${Date(time.inWholeMilliseconds)}")
+    payload.write(index = index, time.inWholeMilliseconds)
+    index += 8
+    val id = UUID.randomUUID()
+    logger.debug("request id: $id")
+    payload.write(index = index, id)
+    val sk = injection.secrets.newSecretKey()
+    val pb = injection.secrets.toPublicKey(authorizedPackage.publicKey)
+    intent.putExtra("encryptedSecretKey", injection.secrets.toBase64(injection.secrets.encrypt(pb, sk.encoded)))
+    intent.putExtra("encryptedPayload", injection.secrets.toBase64(injection.secrets.encrypt(sk, payload)))
+    launcher.launch(intent)
+}
+
 @Composable
 internal fun AuthScreen(
     onAuth: (Keys, ByteArray) -> Unit,
@@ -168,8 +203,10 @@ internal fun AuthScreen(
     val aliasState = remember { mutableStateOf("a202") } // todo
     val pinState = remember { mutableStateOf("0202") } // todo
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { output ->
-        val bytes = output.data?.getByteArrayExtra("bytes")
-        logger.debug("result: ${output.resultCode}\nbytes: ${bytes?.let(App.injection.secrets::sha256)?.toHEX()}")
+        val encryptedPayload = output.data?.getByteArrayExtra("encryptedPayload")
+        logger.debug("result: ${output.resultCode}\nencryptedPayload: ${encryptedPayload?.let(App.injection.secrets::sha256)?.toHEX()}")
+        // todo check
+        // todo delete salt
     }
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -225,22 +262,23 @@ internal fun AuthScreen(
             )
             val aps = remember { getAuthorizedPackages(context = context, logger = logger, secrets = secrets) }
             LazyColumn(modifier = Modifier.fillMaxWidth().weight(1f)) {
-                aps.forEachIndexed { index, it ->
-                    item(key = "$index/${it.name}") {
+                aps.forEachIndexed { index, authorizedPackage ->
+                    item(key = "$index/${authorizedPackage.name}") {
                         val text = """
-                            pcg: ${it.name}
-                            activity: ${it.activity}
-                            public key: ${secrets.sha256(it.publicKey).toHEX()}
+                            pcg: ${authorizedPackage.name}
+                            activity: ${authorizedPackage.activity}
+                            public key: ${secrets.sha256(authorizedPackage.publicKey).toHEX()}
                         """.trimIndent()
                         BasicText(
                             modifier = Modifier.fillMaxWidth()
                                 .background(Color.Yellow)
                                 .clickable {
-                                    logger.debug("launch ${it.name} ${it.activity}")
-                                    val intent = Intent()
-                                    intent.setComponent(ComponentName(it.name, it.activity))
-                                    intent.putExtra("issuer", BuildConfig.APPLICATION_ID) // todo
-                                    launcher.launch(intent)
+                                    logger.debug("on enter: ${authorizedPackage.name} ${authorizedPackage.activity}")
+                                    onEnter(
+                                        logger = logger,
+                                        authorizedPackage = authorizedPackage,
+                                        launcher = launcher,
+                                    )
                                 }
                                 .wrapContentHeight(),
                             text = text,

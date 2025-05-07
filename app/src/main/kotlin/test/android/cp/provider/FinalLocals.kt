@@ -36,11 +36,11 @@ internal class FinalLocals(
         }
 
     private fun SharedPreferences.Editor.putString(key: String, bytes: ByteArray): SharedPreferences.Editor {
-        return putString(key, secrets.base64(bytes = bytes))
+        return putString(key, secrets.toBase64String(bytes = bytes))
     }
 
     private fun SharedPreferences.getBytes(key: String): ByteArray {
         val text = getString(key, null) ?: error("No \"$key\"!")
-        return secrets.base64(text = text)
+        return secrets.fromBase64(text = text)
     }
 }

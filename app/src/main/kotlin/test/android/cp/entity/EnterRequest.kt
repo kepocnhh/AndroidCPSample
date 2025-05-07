@@ -4,8 +4,7 @@ import java.util.UUID
 import kotlin.time.Duration
 
 internal class EnterRequest(
-    val publicKey: ByteArray,
+    val authority: String,
     val time: Duration,
     val id: UUID,
-    val signature: ByteArray,
 )

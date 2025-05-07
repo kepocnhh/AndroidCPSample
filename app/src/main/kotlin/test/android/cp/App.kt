@@ -17,6 +17,7 @@ import test.android.cp.provider.FinalAssets
 import test.android.cp.provider.FinalLocals
 import test.android.cp.provider.FinalLoggers
 import test.android.cp.provider.FinalSecrets
+import test.android.cp.provider.FinalTimes
 import test.android.cp.provider.Injection
 import test.android.cp.provider.Logger
 import test.android.cp.provider.Secrets
@@ -34,9 +35,10 @@ internal class App : Application() {
             ),
             loggers = loggers,
             locals = FinalLocals(context = this, secrets = secrets),
-            sessions = Sessions(privateKey = null),
+            sessions = Sessions(privateKey = null, enterSalt = null),
             secrets = secrets,
             assets = FinalAssets(context = this),
+            times = FinalTimes(),
         )
     }
 

@@ -24,7 +24,7 @@ import test.android.cp.util.showToast
 
 @Composable
 internal fun EnterScreen(
-    onEnter: (ByteArray) -> Unit,
+    onEnter: (privateKey: ByteArray) -> Unit,
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current

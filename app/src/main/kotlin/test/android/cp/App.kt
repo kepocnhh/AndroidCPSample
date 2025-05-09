@@ -35,7 +35,7 @@ internal class App : Application() {
             ),
             loggers = loggers,
             locals = FinalLocals(context = this, secrets = secrets),
-            sessions = Sessions(privateKey = null, enterSalt = null),
+            sessions = Sessions(privateKey = null, enterSalt = null, enterState = null),
             secrets = secrets,
             assets = FinalAssets(context = this),
             times = FinalTimes(),

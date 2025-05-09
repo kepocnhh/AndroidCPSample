@@ -28,6 +28,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -39,14 +40,19 @@ import sp.kx.bytes.write
 import test.android.cp.App
 import test.android.cp.BuildConfig
 import test.android.cp.entity.AuthorizedPackage
+import test.android.cp.entity.EnterResponse
+import test.android.cp.entity.EnterSalt
 import test.android.cp.entity.Keys
 import test.android.cp.provider.Logger
 import test.android.cp.provider.Secrets
 import test.android.cp.util.query
 import test.android.cp.util.showToast
 import test.android.cp.util.single
+import java.security.PrivateKey
+import java.security.PublicKey
 import java.util.Date
 import java.util.UUID
+import javax.crypto.SecretKey
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
@@ -114,124 +120,6 @@ private fun getAuthorizedPackages(
     return result
 }
 
-private fun getAuthorities(context: Context): Set<String> {
-    val result = mutableSetOf<String>()
-    val packages = context.packageManager.getInstalledPackages(PackageManager.GET_PROVIDERS)
-    for (pcg in packages) {
-        val providers = pcg.providers ?: continue
-        for (provider in providers) {
-            if (!provider.exported) continue
-            if (!provider.enabled) continue
-            if (BuildConfig.APPLICATION_ID == pcg.packageName) continue
-            if (provider.readPermission != BuildConfig.PROVIDER_PERMISSION) continue
-            result += provider.authority
-        }
-    }
-    return result
-}
-
-private fun getActivities(context: Context): Map<String, Set<String>> {
-    val result = mutableMapOf<String, MutableSet<String>>()
-    val packages = context.packageManager.getInstalledPackages(PackageManager.GET_ACTIVITIES)
-    for (pcg in packages) {
-//        println("[Foo]${pcg.packageName}: activities: ${pcg.activities?.toList()}")
-        val activities = pcg.activities ?: continue
-        for (activity in activities) {
-//            println("[Foo]${pcg.packageName}: activity: ${activity.name}")
-            if (!activity.exported) continue
-            if (!activity.enabled) continue
-            if (BuildConfig.APPLICATION_ID == pcg.packageName) continue
-            if (activity.permission != BuildConfig.PROVIDER_PERMISSION) continue
-            result.getOrPut(pcg.packageName, ::HashSet) += activity.name ?: continue
-        }
-    }
-    return result
-}
-
-private fun onEnter(
-    logger: Logger,
-    authorizedPackage: AuthorizedPackage,
-    launcher: ActivityResultLauncher<Intent>,
-) {
-    val injection = App.injection
-    val intent = Intent()
-    intent.setComponent(ComponentName(authorizedPackage.name, authorizedPackage.activity))
-    val authority = BuildConfig.PROVIDER_AUTHORITY
-    logger.debug("authority: $authority")
-    val authorityEncoded = injection.secrets.toBase64(authority)
-    val payload = ByteArray(4 + authorityEncoded.size + 8 + 16)
-    var index = 0
-    payload.write(index = index, authorityEncoded.size)
-    index += 4
-    System.arraycopy(authorityEncoded, 0, payload, index, authorityEncoded.size)
-    index += authorityEncoded.size
-    val time = injection.times.now()
-    logger.debug("request time: ${Date(time.inWholeMilliseconds)}")
-    payload.write(index = index, time.inWholeMilliseconds)
-    index += 8
-    val id = UUID.randomUUID()
-    logger.debug("request id: $id")
-    payload.write(index = index, id)
-    val sk = injection.secrets.newSecretKey()
-    val pb = injection.secrets.toPublicKey(authorizedPackage.publicKey)
-    intent.putExtra("encryptedSecretKey", injection.secrets.toBase64(injection.secrets.encrypt(pb, sk.encoded)))
-    intent.putExtra("encryptedPayload", injection.secrets.toBase64(injection.secrets.encrypt(sk, payload)))
-    launcher.launch(intent)
-}
-
-private fun onResponse(
-    logger: Logger,
-    event: AuthLogics.Event.OnEnter?,
-    resultCode: Int,
-    encryptedPayload: ByteArray?,
-    signature: ByteArray?,
-) {
-    val injection = App.injection
-    runCatching {
-        if (resultCode != Activity.RESULT_OK) error("Result code is $resultCode!")
-        if (encryptedPayload == null) error("No encrypted payload!")
-        if (signature == null) error("No signature!")
-        val enterSalt = injection.sessions.enterSalt ?: error("No enter salt!")
-        if (event == null) error("No event!")
-        logger.debug("encrypted payload: ${injection.secrets.sha256(encryptedPayload).toHEX()}")
-        val payload = injection.secrets.decrypt(event.secretKey, encryptedPayload)
-        var index = 0
-        val privateKey = ByteArray(payload.readInt(index = index))
-        index += 4
-        System.arraycopy(payload, index, privateKey, 0, privateKey.size)
-        index += privateKey.size
-        val time = payload.readLong(index = index).milliseconds
-        if (injection.times.now() - time > 30.seconds) error("Wrong time!")
-        val salt = injection.secrets.decrypt(event.secretKey, enterSalt.encryptedSalt)
-        var signatureData = ByteArray(8 + 16 + salt.size)
-        index = 0
-        signatureData.write(index = index, enterSalt.time.inWholeMilliseconds)
-        index += 8
-        signatureData.write(index = index, event.id)
-        index += 16
-        System.arraycopy(signatureData, index, salt, 0, salt.size)
-        check(injection.secrets.verify(event.publicKey, signatureData, enterSalt.signature)) { "Signature enter salt error!" }
-        signatureData = ByteArray(8 + 16 + privateKey.size + salt.size)
-        index = 0
-        signatureData.write(index = index, time.inWholeMilliseconds)
-        index += 8
-        signatureData.write(index = index, event.id)
-        index += 16
-        System.arraycopy(signatureData, index, privateKey, 0, privateKey.size)
-        index += privateKey.size
-        System.arraycopy(signatureData, index, salt, 0, salt.size)
-        check(injection.secrets.verify(event.publicKey, signatureData, signature)) { "Signature enter response error!" }
-        injection.secrets.toPrivateKey(privateKey)
-    }.fold(
-        onFailure = { error ->
-            logger.warning("on response error: $error")
-        },
-        onSuccess = { privateKey ->
-            logger.debug("private key: ${injection.secrets.sha256(privateKey.encoded)}")
-        },
-    )
-}
-
 @Composable
 internal fun AuthScreen(
     onAuth: (Keys, ByteArray) -> Unit,
@@ -240,26 +128,20 @@ internal fun AuthScreen(
     val logger = remember { App.injection.loggers.create("[Auth]") }
     val secrets = remember { App.injection.secrets }
     val logics = App.logics<AuthLogics>()
-    val eventState = remember { mutableStateOf<AuthLogics.Event.OnEnter?>(null) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { output ->
-        val event = eventState.value
-        eventState.value = null
-        onResponse(
-            logger = logger,
-            event = event,
-            resultCode = output.resultCode,
-            encryptedPayload = output.data?.getByteArrayExtra("encryptedPayload"),
-            signature = output.data?.getByteArrayExtra("signature"),
-        )
-    }
-    LaunchedEffect(eventState.value) {
-        val event = eventState.value
-        if (event != null) {
-            val intent = Intent()
-            intent.setComponent(ComponentName(event.authorizedPackage.name, event.authorizedPackage.activity))
-            intent.putExtra("encryptedSecretKey", event.encryptedSecretKey)
-            intent.putExtra("encryptedPayload", event.encryptedPayload)
-            launcher.launch(intent)
+        val encryptedPayload = output.data?.getByteArrayExtra("encryptedPayload")
+        val signature = output.data?.getByteArrayExtra("signature")
+        if (output.resultCode != Activity.RESULT_OK) {
+            logger.warning("Result code is ${output.resultCode}!")
+        } else if (encryptedPayload == null) {
+            logger.warning("No encrypted payload!")
+        } else if (signature == null) {
+            logger.warning("No signature!")
+        } else {
+            logics.onEnterResponse(
+                encryptedPayload = encryptedPayload,
+                signature = signature,
+            )
         }
     }
     LaunchedEffect(Unit) {
@@ -277,7 +159,21 @@ internal fun AuthScreen(
                     )
                 }
                 is AuthLogics.Event.OnEnter -> {
-                    eventState.value = event
+                    event.result.fold(
+                        onSuccess = { privateKey ->
+                            logger.debug("private key: ${App.injection.secrets.sha256(privateKey.encoded)}")
+                        },
+                        onFailure = { error ->
+                            logger.warning("on enter error: $error")
+                        },
+                    )
+                }
+                is AuthLogics.Event.OnEnterRequest -> {
+                    val intent = Intent()
+                    intent.setComponent(ComponentName(event.authorizedPackage.name, event.authorizedPackage.activity))
+                    intent.putExtra("encryptedSecretKey", event.encryptedSecretKey)
+                    intent.putExtra("encryptedPayload", event.encryptedPayload)
+                    launcher.launch(intent)
                 }
             }
         }

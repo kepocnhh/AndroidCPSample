@@ -3,6 +3,7 @@ package test.android.cp.provider
 import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.PublicKey
+import java.util.UUID
 import javax.crypto.SecretKey
 
 internal interface Secrets {
@@ -25,4 +26,5 @@ internal interface Secrets {
     fun toBase64(text: String): ByteArray
     fun sign(key: PrivateKey, encoded: ByteArray): ByteArray
     fun verify(key: PublicKey, encoded: ByteArray, signature: ByteArray): Boolean
+    fun newUUID(): UUID
 }

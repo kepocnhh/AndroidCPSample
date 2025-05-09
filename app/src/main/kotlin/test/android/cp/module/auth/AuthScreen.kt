@@ -1,5 +1,6 @@
 package test.android.cp.module.auth
 
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -7,6 +8,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
@@ -30,6 +32,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import sp.kx.bytes.readInt
+import sp.kx.bytes.readLong
 import sp.kx.bytes.toHEX
 import sp.kx.bytes.write
 import test.android.cp.App
@@ -43,6 +47,8 @@ import test.android.cp.util.showToast
 import test.android.cp.util.single
 import java.util.Date
 import java.util.UUID
+import kotlin.time.Duration.Companion.milliseconds
+import kotlin.time.Duration.Companion.seconds
 
 private fun PackageInfo.getPublicKey(
     context: Context,
@@ -173,6 +179,59 @@ private fun onEnter(
     launcher.launch(intent)
 }
 
+private fun onResponse(
+    logger: Logger,
+    event: AuthLogics.Event.OnEnter?,
+    resultCode: Int,
+    encryptedPayload: ByteArray?,
+    signature: ByteArray?,
+) {
+    val injection = App.injection
+    runCatching {
+        if (resultCode != Activity.RESULT_OK) error("Result code is $resultCode!")
+        if (encryptedPayload == null) error("No encrypted payload!")
+        if (signature == null) error("No signature!")
+        val enterSalt = injection.sessions.enterSalt ?: error("No enter salt!")
+        if (event == null) error("No event!")
+        logger.debug("encrypted payload: ${injection.secrets.sha256(encryptedPayload).toHEX()}")
+        val payload = injection.secrets.decrypt(event.secretKey, encryptedPayload)
+        var index = 0
+        val privateKey = ByteArray(payload.readInt(index = index))
+        index += 4
+        System.arraycopy(payload, index, privateKey, 0, privateKey.size)
+        index += privateKey.size
+        val time = payload.readLong(index = index).milliseconds
+        if (injection.times.now() - time > 30.seconds) error("Wrong time!")
+        val salt = injection.secrets.decrypt(event.secretKey, enterSalt.encryptedSalt)
+        var signatureData = ByteArray(8 + 16 + salt.size)
+        index = 0
+        signatureData.write(index = index, enterSalt.time.inWholeMilliseconds)
+        index += 8
+        signatureData.write(index = index, event.id)
+        index += 16
+        System.arraycopy(signatureData, index, salt, 0, salt.size)
+        check(injection.secrets.verify(event.publicKey, signatureData, enterSalt.signature)) { "Signature enter salt error!" }
+        signatureData = ByteArray(8 + 16 + privateKey.size + salt.size)
+        index = 0
+        signatureData.write(index = index, time.inWholeMilliseconds)
+        index += 8
+        signatureData.write(index = index, event.id)
+        index += 16
+        System.arraycopy(signatureData, index, privateKey, 0, privateKey.size)
+        index += privateKey.size
+        System.arraycopy(signatureData, index, salt, 0, salt.size)
+        check(injection.secrets.verify(event.publicKey, signatureData, signature)) { "Signature enter response error!" }
+        injection.secrets.toPrivateKey(privateKey)
+    }.fold(
+        onFailure = { error ->
+            logger.warning("on response error: $error")
+        },
+        onSuccess = { privateKey ->
+            logger.debug("private key: ${injection.secrets.sha256(privateKey.encoded)}")
+        },
+    )
+}
+
 @Composable
 internal fun AuthScreen(
     onAuth: (Keys, ByteArray) -> Unit,
@@ -181,6 +240,28 @@ internal fun AuthScreen(
     val logger = remember { App.injection.loggers.create("[Auth]") }
     val secrets = remember { App.injection.secrets }
     val logics = App.logics<AuthLogics>()
+    val eventState = remember { mutableStateOf<AuthLogics.Event.OnEnter?>(null) }
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { output ->
+        val event = eventState.value
+        eventState.value = null
+        onResponse(
+            logger = logger,
+            event = event,
+            resultCode = output.resultCode,
+            encryptedPayload = output.data?.getByteArrayExtra("encryptedPayload"),
+            signature = output.data?.getByteArrayExtra("signature"),
+        )
+    }
+    LaunchedEffect(eventState.value) {
+        val event = eventState.value
+        if (event != null) {
+            val intent = Intent()
+            intent.setComponent(ComponentName(event.authorizedPackage.name, event.authorizedPackage.activity))
+            intent.putExtra("encryptedSecretKey", event.encryptedSecretKey)
+            intent.putExtra("encryptedPayload", event.encryptedPayload)
+            launcher.launch(intent)
+        }
+    }
     LaunchedEffect(Unit) {
         logics.events.collect { event ->
             when (event) {
@@ -195,6 +276,9 @@ internal fun AuthScreen(
                         },
                     )
                 }
+                is AuthLogics.Event.OnEnter -> {
+                    eventState.value = event
+                }
             }
         }
     }
@@ -202,12 +286,6 @@ internal fun AuthScreen(
     val passwordState = remember { mutableStateOf("qwe202") } // todo
     val aliasState = remember { mutableStateOf("a202") } // todo
     val pinState = remember { mutableStateOf("0202") } // todo
-    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { output ->
-        val encryptedPayload = output.data?.getByteArrayExtra("encryptedPayload")
-        logger.debug("result: ${output.resultCode}\nencryptedPayload: ${encryptedPayload?.let(App.injection.secrets::sha256)?.toHEX()}")
-        // todo check
-        // todo delete salt
-    }
     Box(modifier = Modifier.fillMaxSize()) {
         Column(modifier = Modifier.fillMaxWidth()) {
             BasicText("file")
@@ -273,11 +351,9 @@ internal fun AuthScreen(
                             modifier = Modifier.fillMaxWidth()
                                 .background(Color.Yellow)
                                 .clickable {
-                                    logger.debug("on enter: ${authorizedPackage.name} ${authorizedPackage.activity}")
-                                    onEnter(
-                                        logger = logger,
+                                    logics.enter(
                                         authorizedPackage = authorizedPackage,
-                                        launcher = launcher,
+                                        authority = BuildConfig.PROVIDER_AUTHORITY,
                                     )
                                 }
                                 .wrapContentHeight(),

@@ -35,7 +35,7 @@ internal class FinalContentProvider : ContentProvider() {
                     }
                     "/putSalt" -> {
                         val time = uri.getQueryParameter("time")?.toLongOrNull()?.milliseconds ?: error("No time!")
-                        if (injection.times.now() - time > 30.seconds) error("Wrong time!")
+                        if (injection.times.now() - time > 30.seconds) error("Wrong time!") // todo
                         val encryptedSalt = uri.getQueryParameter("encryptedSalt")?.let(injection.secrets::fromBase64) ?: error("No encrypted salt!")
                         val signature = uri.getQueryParameter("signature")?.let(injection.secrets::fromBase64) ?: error("No signature!")
                         injection.sessions.enterSalt = EnterSalt(

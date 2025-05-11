@@ -161,7 +161,7 @@ internal fun AuthScreen(
                 is AuthLogics.Event.OnEnter -> {
                     event.result.fold(
                         onSuccess = { privateKey ->
-                            logger.debug("private key: ${App.injection.secrets.sha256(privateKey.encoded)}")
+                            logger.debug("private key: ${App.injection.secrets.sha256(privateKey.encoded).toHEX()}")
                         },
                         onFailure = { error ->
                             logger.warning("on enter error: $error")

@@ -52,9 +52,13 @@ internal class EnterActivity : ComponentActivity() {
         index = 0
         signatureData.write(index = index, time.inWholeMilliseconds)
         index += 8
+        logger.debug("response time: ${Date(time.inWholeMilliseconds)} ${time.inWholeMilliseconds}")
         signatureData.write(index = index, id)
         index += 16
+        logger.debug("response id: $id")
         System.arraycopy(salt, 0, signatureData, index, salt.size)
+        logger.debug("response salt: ${secrets.sha256(salt).toHEX()}")
+        logger.debug("response signature data: ${secrets.sha256(signatureData).toHEX()}")
         return EnterResponse(
             encryptedPayload = secrets.encrypt(secretKey, payload),
             signature = secrets.sign(privateKey, signatureData),
@@ -70,14 +74,19 @@ internal class EnterActivity : ComponentActivity() {
         authority: String,
         secrets: Secrets,
     ) {
-        val encoded = ByteArray(8 + 16 + salt.size)
+        logger.debug("salt: ${secrets.sha256(salt).toHEX()}")
+        val signatureData = ByteArray(8 + 16 + salt.size)
         var index = 0
-        encoded.write(index = index, time.inWholeMilliseconds)
+        signatureData.write(index = index, time.inWholeMilliseconds)
         index += 8
-        encoded.write(index = index, id)
-        System.arraycopy(salt, 0, encoded, 8 + 16, salt.size)
+        logger.debug("salt time: ${Date(time.inWholeMilliseconds)} ${time.inWholeMilliseconds}")
+        signatureData.write(index = index, id)
+        index += 16
+        logger.debug("salt id: $id")
+        System.arraycopy(salt, 0, signatureData, index, salt.size)
+        val signature = secrets.sign(privateKey, signatureData)
+        logger.debug("salt signature data: ${secrets.sha256(signatureData).toHEX()}")
         val encryptedSalt = secrets.encrypt(secretKey, salt)
-        val signature = secrets.sign(privateKey, encoded)
         val uri = Uri.Builder()
             .scheme("content")
             .authority(authority)

@@ -116,13 +116,17 @@ internal class AuthLogics(
         secretKey: SecretKey,
     ): ByteArray {
         val salt = injection.secrets.decrypt(secretKey, enterSalt.encryptedSalt)
+        logger.debug("salt: ${injection.secrets.sha256(salt).toHEX()}")
         val signatureData = ByteArray(8 + 16 + salt.size)
         var index = 0
         signatureData.write(index = index, enterSalt.time.inWholeMilliseconds)
         index += 8
+        logger.debug("salt time: ${Date(enterSalt.time.inWholeMilliseconds)} ${enterSalt.time.inWholeMilliseconds}")
         signatureData.write(index = index, id)
         index += 16
-        System.arraycopy(signatureData, index, salt, 0, salt.size)
+        logger.debug("salt id: $id")
+        System.arraycopy(salt, 0, signatureData, index, salt.size)
+        logger.debug("salt signature data: ${injection.secrets.sha256(signatureData).toHEX()}")
         check(injection.secrets.verify(publicKey, signatureData, enterSalt.signature)) { "Signature enter salt error!" }
         return salt
     }
@@ -143,15 +147,17 @@ internal class AuthLogics(
         index += privateKey.size
         val time = payload.readLong(index = index).milliseconds
         if (injection.times.now() - time > 30.seconds) error("Wrong time!") // todo
-        val signatureData = ByteArray(8 + 16 + privateKey.size + salt.size)
+        val signatureData = ByteArray(8 + 16 + salt.size)
         index = 0
         signatureData.write(index = index, time.inWholeMilliseconds)
         index += 8
+        logger.debug("response time: ${Date(time.inWholeMilliseconds)} ${time.inWholeMilliseconds}")
         signatureData.write(index = index, id)
         index += 16
-        System.arraycopy(signatureData, index, privateKey, 0, privateKey.size)
-        index += privateKey.size
-        System.arraycopy(signatureData, index, salt, 0, salt.size)
+        logger.debug("response id: $id")
+        System.arraycopy(salt, 0, signatureData, index, salt.size)
+        logger.debug("response salt: ${injection.secrets.sha256(salt).toHEX()}")
+        logger.debug("response signature data: ${injection.secrets.sha256(signatureData).toHEX()}")
         check(injection.secrets.verify(publicKey, signatureData, signature)) { "Signature enter response error!" }
         return injection.secrets.toPrivateKey(privateKey)
     }

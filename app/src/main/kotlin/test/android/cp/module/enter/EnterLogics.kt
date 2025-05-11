@@ -11,7 +11,7 @@ internal class EnterLogics(
     private val injection: Injection,
 ) : Logics(injection.contexts.main) {
     sealed interface Event {
-        class OnEnter(val result: Result<ByteArray>) : Event
+        class OnEnter(val result: Result<Pair<ByteArray, ByteArray>>) : Event
     }
 
     private val _events = MutableSharedFlow<Event>()
@@ -24,12 +24,13 @@ internal class EnterLogics(
         val result = withContext(injection.contexts.default) {
             runCatching {
                 if (pin.isBlank()) error("PIN is blank!")
-                val secretKey = injection.secrets.getSecretKey(password = pin.toCharArray())
+                val password = injection.secrets.sha256(pin.toByteArray())
+                val secretKey = injection.secrets.getSecretKey(password = password.toHEX().toCharArray())
                 logger.debug("secret:key: ${injection.secrets.sha256(secretKey.encoded).toHEX()}")
                 val keys = injection.locals.keys ?: TODO("No local keys!")
                 val decrypted = injection.secrets.decrypt(secretKey, keys.privateKeyEncrypted)
                 logger.debug("private:key: ${injection.secrets.sha256(decrypted).toHEX()}")
-                decrypted
+                decrypted to password
             }
         }
         _events.emit(Event.OnEnter(result))

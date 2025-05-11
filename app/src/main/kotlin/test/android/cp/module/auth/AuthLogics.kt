@@ -42,35 +42,46 @@ internal class AuthLogics(
 
     private val logger = injection.loggers.create("[Auth]")
 
+    private fun getKeys(
+        publicKey: PublicKey,
+        privateKey: ByteArray,
+        password: CharArray,
+    ): Keys {
+        val secretKey = injection.secrets.getSecretKey(password = password)
+        logger.debug("secret:key: ${injection.secrets.sha256(secretKey.encoded).toHEX()}")
+        return Keys(
+            publicKey = publicKey.encoded,
+            privateKeyEncrypted = injection.secrets.encrypt(secretKey, privateKey),
+        )
+    }
+
     fun auth(
         file: String,
-        password: String,
+        keyStorePassword: String,
         alias: String,
         pin: String,
     ) = launch {
         val result = withContext(injection.contexts.default) {
             runCatching {
-                if (password.isBlank()) error("Password is blank!")
+                if (keyStorePassword.isBlank()) error("KeyStore password is blank!")
                 if (pin.isBlank()) error("PIN is blank!")
                 logger.debug("read \"$file\"...")
                 val keyStore = injection.assets.getAsset(name = file).use {
                     logger.debug("load key store...")
-                    injection.secrets.toKeyStore(it.readBytes(), password = password.toCharArray())
+                    injection.secrets.toKeyStore(it.readBytes(), password = keyStorePassword.toCharArray())
                 }
-                val privateKey = keyStore.getKey(alias, password.toCharArray()) ?: error("No \"$alias\"!")
-                logger.debug("private:key: ${injection.secrets.sha256(privateKey.encoded).toHEX()}")
-                check(privateKey is PrivateKey)
+                val privateKey = keyStore.getKey(alias, keyStorePassword.toCharArray())?.encoded ?: error("No \"$alias\"!")
+                logger.debug("private:key: ${injection.secrets.sha256(privateKey).toHEX()}")
                 val certificate = keyStore.getCertificate(alias)
                 logger.debug("certificate: ${injection.secrets.sha256(certificate.encoded).toHEX()}")
                 val publicKey = certificate.publicKey
                 logger.debug("public:key: ${injection.secrets.sha256(publicKey.encoded).toHEX()}")
-                val secretKey = injection.secrets.getSecretKey(password = pin.toCharArray())
-                logger.debug("secret:key: ${injection.secrets.sha256(secretKey.encoded).toHEX()}")
-                val keys = Keys(
-                    publicKey = publicKey.encoded,
-                    privateKeyEncrypted = injection.secrets.encrypt(secretKey, privateKey.encoded),
-                )
-                keys to privateKey.encoded
+                val password = injection.secrets.sha256(pin.toByteArray())
+                getKeys(
+                    publicKey = publicKey,
+                    privateKey = privateKey,
+                    password = password.toHEX().toCharArray(),
+                ) to privateKey
             }
         }
         _events.emit(Event.OnAuth(result))
@@ -138,16 +149,20 @@ internal class AuthLogics(
         salt: ByteArray,
         encryptedPayload: ByteArray,
         signature: ByteArray,
-    ): PrivateKey {
+    ): Pair<ByteArray, ByteArray> {
         val payload = injection.secrets.decrypt(secretKey, encryptedPayload)
         var index = 0
         val privateKey = ByteArray(payload.readInt(index = index))
         index += 4
         System.arraycopy(payload, index, privateKey, 0, privateKey.size)
         index += privateKey.size
+        val password = ByteArray(payload.readInt(index = index))
+        index += 4
+        System.arraycopy(payload, index, password, 0, password.size)
+        index += password.size
         val time = payload.readLong(index = index).milliseconds
         if (injection.times.now() - time > 30.seconds) error("Wrong time!") // todo
-        val signatureData = ByteArray(8 + 16 + salt.size)
+        val signatureData = ByteArray(8 + 16 + password.size + salt.size)
         index = 0
         signatureData.write(index = index, time.inWholeMilliseconds)
         index += 8
@@ -155,11 +170,14 @@ internal class AuthLogics(
         signatureData.write(index = index, id)
         index += 16
         logger.debug("response id: $id")
+        System.arraycopy(password, 0, signatureData, index, password.size)
+        index += password.size
+        logger.debug("response password: ${injection.secrets.sha256(password).toHEX()}")
         System.arraycopy(salt, 0, signatureData, index, salt.size)
         logger.debug("response salt: ${injection.secrets.sha256(salt).toHEX()}")
         logger.debug("response signature data: ${injection.secrets.sha256(signatureData).toHEX()}")
         check(injection.secrets.verify(publicKey, signatureData, signature)) { "Signature enter response error!" }
-        return injection.secrets.toPrivateKey(privateKey)
+        return privateKey to password
     }
 
     fun onEnterResponse(
@@ -179,7 +197,7 @@ internal class AuthLogics(
                     publicKey = state.publicKey,
                     secretKey = state.secretKey,
                 )
-                getPrivateKey(
+                val (privateKey, password) = getPrivateKey(
                     id = state.id,
                     publicKey = state.publicKey,
                     secretKey = state.secretKey,
@@ -187,8 +205,13 @@ internal class AuthLogics(
                     encryptedPayload = encryptedPayload,
                     signature = signature,
                 )
+                getKeys(
+                    publicKey = state.publicKey,
+                    privateKey = privateKey,
+                    password = password.toHEX().toCharArray(),
+                ) to privateKey
             }
         }
-        _events.emit(Event.OnEnter(result))
+        _events.emit(Event.OnAuth(result))
     }
 }

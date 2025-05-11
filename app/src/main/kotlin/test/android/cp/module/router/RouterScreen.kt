@@ -24,7 +24,9 @@ internal fun RouterScreen() {
                 )
             } else {
                 EnterScreen(
-                    onEnter = logics::enter,
+                    onEnter = { privateKey: ByteArray, _ ->
+                        logics.enter(privateKey = privateKey)
+                    },
                     onExit = logics::exit,
                 )
             }

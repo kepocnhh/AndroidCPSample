@@ -24,7 +24,7 @@ import test.android.cp.util.showToast
 
 @Composable
 internal fun EnterScreen(
-    onEnter: (privateKey: ByteArray) -> Unit,
+    onEnter: (privateKey: ByteArray, password: ByteArray) -> Unit,
     onExit: () -> Unit,
 ) {
     val context = LocalContext.current
@@ -35,7 +35,9 @@ internal fun EnterScreen(
             when (event) {
                 is EnterLogics.Event.OnEnter -> {
                     event.result.fold(
-                        onSuccess = onEnter,
+                        onSuccess = { (privateKey: ByteArray, password: ByteArray) ->
+                            onEnter(privateKey, password)
+                        },
                         onFailure = { error ->
                             logger.warning("enter error: $error")
                             context.showToast("enter error: $error")

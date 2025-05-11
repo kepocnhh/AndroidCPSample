@@ -8,9 +8,7 @@ import android.content.pm.PackageInfo
 import android.content.pm.PackageManager
 import android.database.Cursor
 import android.net.Uri
-import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,33 +26,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import sp.kx.bytes.readInt
-import sp.kx.bytes.readLong
 import sp.kx.bytes.toHEX
-import sp.kx.bytes.write
 import test.android.cp.App
 import test.android.cp.BuildConfig
 import test.android.cp.entity.AuthorizedPackage
-import test.android.cp.entity.EnterResponse
-import test.android.cp.entity.EnterSalt
 import test.android.cp.entity.Keys
 import test.android.cp.provider.Logger
 import test.android.cp.provider.Secrets
 import test.android.cp.util.query
 import test.android.cp.util.showToast
 import test.android.cp.util.single
-import java.security.PrivateKey
-import java.security.PublicKey
-import java.util.Date
-import java.util.UUID
-import javax.crypto.SecretKey
-import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 private fun PackageInfo.getPublicKey(
     context: Context,
@@ -179,7 +164,7 @@ internal fun AuthScreen(
         }
     }
     val fileState = remember { mutableStateOf("a202.pkcs12") } // todo
-    val passwordState = remember { mutableStateOf("qwe202") } // todo
+    val keyStorePasswordState = remember { mutableStateOf("qwe202") } // todo
     val aliasState = remember { mutableStateOf("a202") } // todo
     val pinState = remember { mutableStateOf("0202") } // todo
     Box(modifier = Modifier.fillMaxSize()) {
@@ -199,8 +184,8 @@ internal fun AuthScreen(
                     .height(36.dp)
                     .background(Color.LightGray)
                     .wrapContentHeight(),
-                value = passwordState.value,
-                onValueChange = { passwordState.value = it },
+                value = keyStorePasswordState.value,
+                onValueChange = { keyStorePasswordState.value = it },
             )
             BasicText("alias")
             BasicTextField(
@@ -226,7 +211,7 @@ internal fun AuthScreen(
                     .clickable {
                         logics.auth(
                             file = fileState.value,
-                            password = passwordState.value,
+                            keyStorePassword = keyStorePasswordState.value,
                             alias = aliasState.value,
                             pin = pinState.value,
                         )

@@ -34,6 +34,7 @@ internal class EnterActivity : ComponentActivity() {
 
     private fun getEnterResponse(
         privateKey: PrivateKey,
+        password: ByteArray,
         secretKey: SecretKey,
         time: Duration,
         salt: ByteArray,
@@ -41,14 +42,18 @@ internal class EnterActivity : ComponentActivity() {
         secrets: Secrets,
     ): EnterResponse {
         val privateKeySize = privateKey.encoded.size
-        val payload = ByteArray(4 + privateKeySize + 8)
+        val payload = ByteArray(4 + privateKeySize + 4 + password.size + 8)
         var index = 0
         payload.write(index = index, privateKeySize)
         index += 4
         System.arraycopy(privateKey.encoded, 0, payload, index, privateKeySize)
         index += privateKeySize
+        payload.write(index = index, password.size)
+        index += 4
+        System.arraycopy(password, 0, payload, index, password.size)
+        index += password.size
         payload.write(index = index, time.inWholeMilliseconds)
-        val signatureData = ByteArray(8 + 16 + salt.size)
+        val signatureData = ByteArray(8 + 16 + password.size + salt.size)
         index = 0
         signatureData.write(index = index, time.inWholeMilliseconds)
         index += 8
@@ -56,6 +61,9 @@ internal class EnterActivity : ComponentActivity() {
         signatureData.write(index = index, id)
         index += 16
         logger.debug("response id: $id")
+        System.arraycopy(password, 0, signatureData, index, password.size)
+        index += password.size
+        logger.debug("response password: ${secrets.sha256(password).toHEX()}")
         System.arraycopy(salt, 0, signatureData, index, salt.size)
         logger.debug("response salt: ${secrets.sha256(salt).toHEX()}")
         logger.debug("response signature data: ${secrets.sha256(signatureData).toHEX()}")
@@ -132,6 +140,7 @@ internal class EnterActivity : ComponentActivity() {
     private fun onEnter(
         requestTime: Duration,
         privateKey: ByteArray,
+        password: ByteArray,
         encryptedSecretKey: ByteArray,
         encryptedPayload: ByteArray,
     ) {
@@ -158,6 +167,7 @@ internal class EnterActivity : ComponentActivity() {
                     )
                     getEnterResponse(
                         privateKey = pk,
+                        password = password,
                         secretKey = sk,
                         time = injection.times.now(),
                         salt = salt,
@@ -207,10 +217,12 @@ internal class EnterActivity : ComponentActivity() {
         val requestTime = injection.times.now()
         view.setContent {
             EnterScreen(
-                onEnter = { privateKey: ByteArray ->
+                // todo enter request/response
+                onEnter = { privateKey: ByteArray, password: ByteArray ->
                     onEnter(
                         requestTime = requestTime,
                         privateKey = privateKey,
+                        password = password,
                         encryptedSecretKey = encryptedSecretKey,
                         encryptedPayload = encryptedPayload,
                     )
